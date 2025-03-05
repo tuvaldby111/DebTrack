@@ -422,6 +422,9 @@
             <div class="preset-amounts" id="presetAmounts">
               <button type="button" class="amount-btn" data-amount="5">5 ₪</button>
               <button type="button" class="amount-btn" data-amount="10">10 ₪</button>
+              <button type="button" class="amount-btn" data-amount="20">20 ₪</button>
+              <button type="button" class="amount-btn" data-amount="30">30 ₪</button>
+
               <button type="button" class="amount-btn" id="customAmountBtn">Custom</button>
             </div>
             <input type="number" id="customAmountInput" step="0.01" placeholder="Enter custom amount">
@@ -872,54 +875,80 @@ function renderPhysicalLeaderboard() {
       });
     }
     function renderGraph2() {
-      if (balanceChart2) balanceChart2.destroy();
-      const userHistories = {};
-      users.forEach(u => { userHistories[u.username] = [{ date: new Date(0), balance: 0 }]; });
-      const sorted = [...entries].sort((a, b) => new Date(a.date) - new Date(b.date));
-      const runningBalances = {};
-      users.forEach(u => { runningBalances[u.username] = 0; });
-      sorted.forEach(e => {
-        if (e.paymentMethod === 'physical') return;
-        const amt = parseFloat(e.amount);
-        runningBalances[e.creditor] += amt;
-        runningBalances[e.debtor] -= amt;
-        [e.creditor, e.debtor].forEach(uName => {
-          userHistories[uName].push({
-            date: new Date(e.date),
-            balance: runningBalances[uName]
-          });
-        });
+  if (balanceChart2) balanceChart2.destroy();
+  const userHistories = {};
+  users.forEach(u => { 
+    userHistories[u.username] = [{ date: new Date(0), balance: 0 }]; 
+  });
+  const sorted = [...entries].sort((a, b) => new Date(a.date) - new Date(b.date));
+  
+  // Determine the min and max dates based on transactions
+  let minDate = new Date();
+  let maxDate = new Date(0);
+  if (sorted.length > 0) {
+    minDate = new Date(sorted[0].date);
+    maxDate = new Date(sorted[sorted.length - 1].date);
+  }
+  
+  const runningBalances = {};
+  users.forEach(u => { runningBalances[u.username] = 0; });
+  
+  sorted.forEach(e => {
+    if (e.paymentMethod === 'physical') return;
+    const amt = parseFloat(e.amount);
+    runningBalances[e.creditor] += amt;
+    runningBalances[e.debtor] -= amt;
+    [e.creditor, e.debtor].forEach(uName => {
+      userHistories[uName].push({
+        date: new Date(e.date),
+        balance: runningBalances[uName]
       });
-      const datasets = [];
-      Object.keys(userHistories).forEach(username => {
-        const h = userHistories[username];
-        if (h.length <= 1 && h[0].balance === 0) return;
-        datasets.push({
-          label: username,
-          data: h.map(p => ({ x: p.date, y: p.balance })),
-          borderColor: getRandomColor(),
-          fill: false
-        });
-      });
-      balanceChart2 = new Chart(balanceChartCanvas2, {
-        type: 'line',
-        data: { datasets },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          layout: {
-        padding: {
-          bottom: 100  // add extra space at the bottom
-        }
-      },
-          scales: {
-            x: { type: 'time', time: { unit: 'day' }, title: { display: true, text: 'Time' } },
-            y: { title: { display: true, text: 'Balance (₪)' } }
+    });
+  });
+  
+  const datasets = [];
+  Object.keys(userHistories).forEach(username => {
+    const h = userHistories[username];
+    if (h.length <= 1 && h[0].balance === 0) return;
+    datasets.push({
+      label: username,
+      data: h.map(p => ({ x: p.date, y: p.balance })),
+      borderColor: getRandomColor(),
+      fill: false,
+      pointStyle: 'circle',
+      pointRadius: 6,
+      tension: 0.3,  // smooth curves
+      borderWidth: 2
+    });
+  });
+  
+  balanceChart2 = new Chart(balanceChartCanvas2, {
+    type: 'line',
+    data: { datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      layout: { padding: { bottom: 20 } },
+      scales: {
+        x: {
+          type: 'time',
+          time: {
+            unit: 'day',
+            displayFormats: { day: 'MMM d, h:mm a' }
           },
-          layout: { padding: { bottom: 20 } }
-        }
-      });
+          title: { display: true, text: 'Time' },
+          min: minDate,
+          max: maxDate
+        },
+        y: { title: { display: true, text: 'Balance (₪)' } }
+      },
+      plugins: {
+        legend: { display: true, position: 'top' }
+      }
     }
+  });
+}
+
 
     // Analytics Table
     function renderAnalyticsTable() {
