@@ -1,27 +1,12 @@
 // server.js
 const express = require('express');
-const fs = require('fs');
+const db = require('./db'); // our new SQLite database module
 const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
-const DATA_FILE = path.join(__dirname, 'data.json');
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
-
-// Utility: read data from JSON file
-function readData() {
-  if (!fs.existsSync(DATA_FILE)) {
-    return { users: [], entries: [] };
-  }
-  const rawData = fs.readFileSync(DATA_FILE);
-  return JSON.parse(rawData);
-}
-
-// Utility: write data to JSON file
-function writeData(data) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-}
 
 // API: Signup
 app.post('/api/signup', (req, res) => {
@@ -29,56 +14,88 @@ app.post('/api/signup', (req, res) => {
   if (!username || !password) {
     return res.json({ success: false, message: 'Username and password are required.' });
   }
-  const data = readData();
-  const existingUser = data.users.find(u => u.username.toLowerCase() === username.toLowerCase());
-  if (existingUser) {
-    return res.json({ success: false, message: 'User already exists.' });
-  }
-  // In production, never store plain text passwords.
-  const newUser = { username, password, profilePicture: "", startingBalance: 0 };
-  data.users.push(newUser);
-  writeData(data);
-  res.json({ success: true, user: newUser });
+  const sql = `
+    INSERT INTO users (username, password, profilePicture, startingBalance)
+    VALUES (?, ?, '', 0)
+  `;
+  db.run(sql, [username, password], function(err) {
+    if (err) {
+      if (err.message.includes('UNIQUE constraint')) {
+        return res.json({ success: false, message: 'User already exists.' });
+      }
+      console.error(err);
+      return res.json({ success: false, message: 'Failed to create user.' });
+    }
+    const newUser = { username, password, profilePicture: '', startingBalance: 0 };
+    return res.json({ success: true, user: newUser });
+  });
 });
 
 // API: Login
 app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
-  const data = readData();
-  const user = data.users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.password === password);
-  if (user) {
-    return res.json({ success: true, user });
-  } else {
-    return res.json({ success: false, message: 'Invalid credentials.' });
-  }
+  const sql = `SELECT * FROM users WHERE lower(username)=lower(?) AND password=?`;
+  db.get(sql, [username, password], (err, row) => {
+    if (err) {
+      console.error(err);
+      return res.json({ success: false, message: 'Error during login.' });
+    }
+    if (row) {
+      return res.json({ success: true, user: row });
+    } else {
+      return res.json({ success: false, message: 'Invalid credentials.' });
+    }
+  });
 });
 
 // API: Reset Password
 app.post('/api/reset-password', (req, res) => {
   const { username, oldPassword, newPassword } = req.body;
-  const data = readData();
-  const userIndex = data.users.findIndex(u => u.username.toLowerCase() === username.toLowerCase());
-  if (userIndex === -1) {
-    return res.json({ success: false, message: 'User not found.' });
-  }
-  if (data.users[userIndex].password !== oldPassword) {
-    return res.json({ success: false, message: 'Old password is incorrect.' });
-  }
-  data.users[userIndex].password = newPassword;
-  writeData(data);
-  res.json({ success: true });
+  const sqlSelect = `SELECT * FROM users WHERE lower(username)=lower(?)`;
+  db.get(sqlSelect, [username], (err, row) => {
+    if (err) {
+      console.error(err);
+      return res.json({ success: false, message: 'Error resetting password.' });
+    }
+    if (!row) {
+      return res.json({ success: false, message: 'User not found.' });
+    }
+    if (row.password !== oldPassword) {
+      return res.json({ success: false, message: 'Old password is incorrect.' });
+    }
+    const sqlUpdate = `UPDATE users SET password=? WHERE lower(username)=lower(?)`;
+    db.run(sqlUpdate, [newPassword, username], function(err) {
+      if (err) {
+        console.error(err);
+        return res.json({ success: false, message: 'Failed to update password.' });
+      }
+      return res.json({ success: true });
+    });
+  });
 });
 
 // API: Get all users
 app.get('/api/users', (req, res) => {
-  const data = readData();
-  res.json({ success: true, users: data.users });
+  const sql = `SELECT * FROM users`;
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      console.error(err);
+      return res.json({ success: false, users: [] });
+    }
+    return res.json({ success: true, users: rows });
+  });
 });
 
 // API: Get all entries
 app.get('/api/entries', (req, res) => {
-  const data = readData();
-  res.json({ success: true, entries: data.entries });
+  const sql = `SELECT * FROM entries`;
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      console.error(err);
+      return res.json({ success: false, entries: [] });
+    }
+    return res.json({ success: true, entries: rows });
+  });
 });
 
 // API: Add a new debt entry (virtual or physical transaction)
@@ -87,66 +104,101 @@ app.post('/api/entry', (req, res) => {
   if (!debtor || !creditor || !amount) {
     return res.json({ success: false, message: 'Missing required fields.' });
   }
-  const newEntry = {
-    id: Date.now(),
-    debtor,
-    creditor,
-    amount: parseFloat(amount),
-    description: description || '',
-    date: new Date().toISOString(),
-    status: "accepted",
-    paid: false,
-    paymentMethod: paymentMethod || "virtual"
-  };
-  if (paymentMethod && paymentMethod === "physical") {
-    newEntry.approved = false;
-  }
-  const data = readData();
-  data.entries.push(newEntry);
-  writeData(data);
-  res.json({ success: true, entry: newEntry });
+  const id = Date.now();
+  const sql = `
+    INSERT INTO entries (id, debtor, creditor, amount, description, date, status, paid, paymentMethod, approved)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `;
+  const date = new Date().toISOString();
+  const status = "accepted";
+  const paid = 0;
+  const pm = paymentMethod || "virtual";
+  const approved = (pm === "physical") ? 0 : null; // for virtual, we ignore approved
+  db.run(sql, [id, debtor, creditor, parseFloat(amount), description || '', date, status, paid, pm, approved], function(err) {
+    if (err) {
+      console.error(err);
+      return res.json({ success: false, message: 'Failed to add entry.' });
+    }
+    return res.json({ success: true, entry: { id, debtor, creditor, amount: parseFloat(amount), description: description || '', date, status, paid, paymentMethod: pm, approved } });
+  });
 });
 
 // API: Approve a physical transaction (only if acting user is the creditor)
 app.post('/api/entry/approve', (req, res) => {
   const { id, username } = req.body;
-  const data = readData();
-  const index = data.entries.findIndex(entry => entry.id === id);
-  if (index === -1) {
-    return res.json({ success: false, message: 'Invalid transaction id.' });
-  }
-  const entry = data.entries[index];
-  if (entry.creditor !== username) {
-    return res.json({ success: false, message: 'Not authorized to approve this transaction.' });
-  }
-  data.entries[index].approved = true;
-  writeData(data);
-  res.json({ success: true });
+  const sqlSelect = `SELECT * FROM entries WHERE id = ?`;
+  db.get(sqlSelect, [id], (err, row) => {
+    if (err) {
+      console.error(err);
+      return res.json({ success: false, message: 'Error approving transaction.' });
+    }
+    if (!row) {
+      return res.json({ success: false, message: 'Invalid transaction id.' });
+    }
+    if (row.creditor !== username) {
+      return res.json({ success: false, message: 'Not authorized to approve this transaction.' });
+    }
+    const sqlUpdate = `UPDATE entries SET approved = 1 WHERE id = ?`;
+    db.run(sqlUpdate, [id], function(err) {
+      if (err) {
+        console.error(err);
+        return res.json({ success: false, message: 'Failed to approve transaction.' });
+      }
+      return res.json({ success: true });
+    });
+  });
 });
 
-// API: Update user profile (change username, profile picture, and starting balance optionally)
+// API: Update user profile (change username, profile picture, and optionally starting balance)
 app.put('/api/user', (req, res) => {
   const { username, newUsername, profilePicture, startingBalance } = req.body;
-  const data = readData();
-  const userIndex = data.users.findIndex(u => u.username.toLowerCase() === username.toLowerCase());
-  if (userIndex === -1) {
-    return res.json({ success: false, message: 'User not found.' });
-  }
-  if(newUsername) {
-    const conflict = data.users.find(u => u.username.toLowerCase() === newUsername.toLowerCase());
-    if(conflict) {
-      return res.json({ success: false, message: 'New username is already taken.' });
+  const sqlSelect = `SELECT * FROM users WHERE lower(username)=lower(?)`;
+  db.get(sqlSelect, [username], (err, row) => {
+    if (err) {
+      console.error(err);
+      return res.json({ success: false, message: 'Error updating profile.' });
     }
-    data.users[userIndex].username = newUsername;
-  }
-  if(profilePicture) {
-    data.users[userIndex].profilePicture = profilePicture;
-  }
-  if(typeof startingBalance !== "undefined") {
-    data.users[userIndex].startingBalance = parseFloat(startingBalance);
-  }
-  writeData(data);
-  res.json({ success: true, user: data.users[userIndex] });
+    if (!row) {
+      return res.json({ success: false, message: 'User not found.' });
+    }
+    // Check if new username already exists if provided
+    if(newUsername) {
+      const sqlCheck = `SELECT * FROM users WHERE lower(username)=lower(?)`;
+      db.get(sqlCheck, [newUsername], (err, conflict) => {
+        if (conflict) {
+          return res.json({ success: false, message: 'New username is already taken.' });
+        } else {
+          updateUser();
+        }
+      });
+    } else {
+      updateUser();
+    }
+    
+    function updateUser() {
+      const sqlUpdate = `
+        UPDATE users 
+        SET username = COALESCE(?, username), 
+            profilePicture = COALESCE(?, profilePicture), 
+            startingBalance = COALESCE(?, startingBalance)
+        WHERE lower(username)=lower(?)
+      `;
+      db.run(sqlUpdate, [newUsername, profilePicture, (typeof startingBalance !== "undefined") ? parseFloat(startingBalance) : null, username], function(err) {
+        if (err) {
+          console.error(err);
+          return res.json({ success: false, message: 'Failed to update profile.' });
+        }
+        const sqlReturn = `SELECT * FROM users WHERE lower(username)=lower(?)`;
+        db.get(sqlReturn, [newUsername || username], (err, updatedUser) => {
+          if (err) {
+            console.error(err);
+            return res.json({ success: false, message: 'Error retrieving updated user.' });
+          }
+          return res.json({ success: true, user: updatedUser });
+        });
+      });
+    }
+  });
 });
 
 app.listen(PORT, () => {
