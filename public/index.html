@@ -755,7 +755,7 @@
     div.classList.add('leaderboard-item');
     div.innerHTML = `
       <span>${idx + 1}.</span>
-      <img src="${userObj?.profilePicture || 'https://via.placeholder.com/40?text=User'}" alt="${username}">
+      <img src="${userObj?.profilePicture || 'https://upload.wikimedia.org/wikipedia/commons/8/89/Portrait_Placeholder.png'}" alt="${username}">
       <div class="info" style="background-color: ${color}; color: black;">
         <span>${username}: ${balance.toFixed(2)} ₪</span>
       </div>
@@ -894,17 +894,22 @@ function renderPhysicalLeaderboard() {
   users.forEach(u => { runningBalances[u.username] = 0; });
   
   sorted.forEach(e => {
-    if (e.paymentMethod === 'physical') return;
-    const amt = parseFloat(e.amount);
-    runningBalances[e.creditor] += amt;
-    runningBalances[e.debtor] -= amt;
-    [e.creditor, e.debtor].forEach(uName => {
-      userHistories[uName].push({
-        date: new Date(e.date),
-        balance: runningBalances[uName]
-      });
+  if (e.paymentMethod === 'physical') return;
+  const amt = parseFloat(e.amount);
+  runningBalances[e.creditor] += amt;
+  runningBalances[e.debtor] -= amt;
+  [e.creditor, e.debtor].forEach(uName => {
+    // If this username isn't present in userHistories, initialize it
+    if (!userHistories[uName]) {
+      userHistories[uName] = [{ date: new Date(0), balance: 0 }];
+    }
+    userHistories[uName].push({
+      date: new Date(e.date),
+      balance: runningBalances[uName]
     });
   });
+});
+
   
   const datasets = [];
   Object.keys(userHistories).forEach(username => {
