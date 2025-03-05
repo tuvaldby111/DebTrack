@@ -1,0 +1,135 @@
+{
+  "users": [
+    {
+      "username": "Shahar Shoham",
+      "password": "123",
+      "profilePicture": "https://i.ytimg.com/vi/h94EiFIAE50/hq720.jpg?sqp=-oaymwEhCK4FEIIDSFryq4qpAxMIARUAAAAAGAElAADIQj0AgKJD&rs=AOn4CLBmXa6xjQNS9g7Mar-FF1DE3KtTmw"
+    },
+    {
+      "username": "Tuval Dembo Ben-Yohana",
+      "password": "123",
+      "profilePicture": "https://www.ravdori.co.il///wp-content/uploads/2015/06/033.jpg"
+    },
+    {
+      "username": "Sagi Amsalem",
+      "password": "123",
+      "profilePicture": "https://images.globes.co.il/images/NewGlobes/big_image_800/2020/800x392.2020616T192827.jpg"
+    },
+    {
+      "username": "Ido Vienta",
+      "password": "12345",
+      "profilePicture": "https://media.licdn.com/dms/image/v2/C5603AQHCCwpcT7TX6w/profile-displayphoto-shrink_200_200/profile-displayphoto-shrink_200_200/0/1536746583546?e=2147483647&v=beta&t=zDO0VTUb9RDjFwPFgHynOOq221xV1kpgLfwUPI9LS-Q",
+      "startingBalance": 0
+    },
+    {
+      "username": "Peleg Kaplan",
+      "password": "123",
+      "profilePicture": "https://static.vecteezy.com/system/resources/previews/009/952/572/non_2x/male-profile-picture-vector.jpg",
+      "startingBalance": 0
+    }
+  ],
+  "entries": [
+    {
+      "id": 1740823527624,
+      "debtor": "Peleg Kaplan",
+      "creditor": "Tuval Dembo Ben-Yohana",
+      "amount": 10,
+      "description": "",
+      "date": "2025-03-01T10:05:27.624Z",
+      "status": "accepted",
+      "paid": false,
+      "paymentMethod": "virtual"
+    },
+    {
+      "id": 1740823542447,
+      "debtor": "Peleg Kaplan",
+      "creditor": "Tuval Dembo Ben-Yohana",
+      "amount": 10,
+      "description": "בקפיטריה שילמתי עליך",
+      "date": "2025-03-01T10:05:42.447Z",
+      "status": "accepted",
+      "paid": false,
+      "paymentMethod": "physical",
+      "approved": true
+    },
+    {
+      "id": 1740823586346,
+      "debtor": "Tuval Dembo Ben-Yohana",
+      "creditor": "Peleg Kaplan",
+      "amount": 20,
+      "description": "Offset for approved physical payment",
+      "date": "2025-03-01T10:06:26.346Z",
+      "status": "accepted",
+      "paid": false,
+      "paymentMethod": "virtual"
+    },
+    {
+      "id": 1740823695814,
+      "debtor": "Tuval Dembo Ben-Yohana",
+      "creditor": "Peleg Kaplan",
+      "amount": 10,
+      "description": "becaaase",
+      "date": "2025-03-01T10:08:15.814Z",
+      "status": "accepted",
+      "paid": false,
+      "paymentMethod": "physical",
+      "approved": true
+    },
+    {
+      "id": 1740823715093,
+      "debtor": "Peleg Kaplan",
+      "creditor": "Tuval Dembo Ben-Yohana",
+      "amount": 10,
+      "description": "Offset for approved physical payment",
+      "date": "2025-03-01T10:08:35.093Z",
+      "status": "accepted",
+      "paid": false,
+      "paymentMethod": "virtual"
+    },
+    {
+      "id": 1740835667991,
+      "debtor": "Peleg Kaplan",
+      "creditor": "Shahar Shoham",
+      "amount": 10,
+      "description": "",
+      "date": "2025-03-01T13:27:47.991Z",
+      "status": "accepted",
+      "paid": false,
+      "paymentMethod": "virtual"
+    },
+    {
+      "id": 1740835680186,
+      "debtor": "Peleg Kaplan",
+      "creditor": "Sagi Amsalem",
+      "amount": 5,
+      "description": "",
+      "date": "2025-03-01T13:28:00.186Z",
+      "status": "accepted",
+      "paid": false,
+      "paymentMethod": "virtual"
+    },
+    {
+      "id": 1740835703802,
+      "debtor": "Peleg Kaplan",
+      "creditor": "Shahar Shoham",
+      "amount": 10,
+      "description": "paid in the caffiteria",
+      "date": "2025-03-01T13:28:23.802Z",
+      "status": "accepted",
+      "paid": false,
+      "paymentMethod": "physical",
+      "approved": true
+    },
+    {
+      "id": 1740835723111,
+      "debtor": "Shahar Shoham",
+      "creditor": "Peleg Kaplan",
+      "amount": 10,
+      "description": "Offset for approved physical payment",
+      "date": "2025-03-01T13:28:43.111Z",
+      "status": "accepted",
+      "paid": false,
+      "paymentMethod": "virtual"
+    }
+  ]
+}

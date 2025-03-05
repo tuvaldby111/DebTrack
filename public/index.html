@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Debt Tracker Dashboard</title>
+  <!-- Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+  <!-- Chart.js and Date Adapter -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+  <style>
+    :root {
+      --background-color: #ffffff;
+      --primary-color: #f5f5f5;
+      --accent-color: #5a6178;  /* softened accent color */
+      --text-color: #333333;
+      --header-bg: var(--primary-color);
+      --box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Poppins', sans-serif;
+      background-color: var(--background-color);
+      color: var(--text-color);
+      line-height: 1.6;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+    header {
+      background: var(--header-bg);
+      padding: 20px;
+      text-align: center;
+      box-shadow: var(--box-shadow);
+      border-bottom: 1px solid var(--primary-color);
+    }
+    header h1 {
+      margin: 0;
+      font-size: 2rem;
+      color: var(--accent-color);
+    }
+    nav.top-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: var(--primary-color);
+      padding: 10px 20px;
+      border-bottom: 1px solid var(--accent-color);
+      margin-bottom: 20px;
+    }
+    nav.top-nav .nav-links {
+      display: flex;
+      gap: 15px;
+    }
+    nav.top-nav .nav-links button {
+      background: none;
+      border: none;
+      font-size: 1rem;
+      color: var(--accent-color);
+      cursor: pointer;
+      padding: 6px 10px;
+      border-radius: 4px;
+      transition: background 0.3s;
+    }
+    nav.top-nav .nav-links button:hover {
+      background-color: var(--accent-color);
+      color: #fff;
+    }
+    nav.top-nav .auth-actions button {
+      background-color: var(--accent-color);
+      border: none;
+      padding: 8px 12px;
+      border-radius: 4px;
+      color: #fff;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    nav.top-nav .auth-actions button:hover {
+      background-color: var(--primary-color);
+    }
+    .page { display: none; }
+    .page.active { display: block; }
+    /* Dashboard grid: two leaderboards, a form, and a graph */
+    .dashboard-container {
+      width: 95%;
+      max-width: 1200px;
+      margin: 0 auto 20px auto;
+      display: grid;
+      grid-template-areas:
+        "virtualLeaderboard physicalLeaderboard"
+        "form form"
+        "graph graph";
+      grid-gap: 20px;
+    }
+    .card {
+      background-color: var(--background-color);
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: var(--box-shadow);
+      border: 1px solid var(--primary-color);
+      animation: fadeIn 0.8s ease-in-out;
+      text-align: center;
+    }
+    .virtual-leaderboard { grid-area: virtualLeaderboard; }
+    .physical-leaderboard { grid-area: physicalLeaderboard; }
+    .leaderboard h2 {
+      margin-bottom: 10px;
+      font-size: 1.5rem;
+      color: var(--accent-color);
+      border-bottom: 1px solid var(--primary-color);
+      padding-bottom: 5px;
+    }
+    .leaderboard-list {
+      display: block;
+      margin: 0;
+      padding: 0;
+    }
+    .leaderboard-item {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 10px;
+      width: 100%;
+    }
+    .leaderboard-item img {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 1px solid var(--accent-color);
+    }
+    .leaderboard-item .info {
+      padding: 4px 8px;
+      border-radius: 6px;
+      background-color: var(--accent-color);
+      color: var(--background-color);
+    }
+    .leaderboard-item {
+  transition: transform 0.1s ease, margin 0.1s ease;
+}
+
+.leaderboard-item:hover {
+  transform: scale(1.05);
+  margin-bottom: 10px;
+}
+
+    .graph-section {
+      grid-area: graph;
+      height: 500px; /* preserved graph container height */
+      position: relative;
+      overflow: visible;
+    }
+    .graph-section canvas {
+      width: 100% !important;
+      height: 100% !important;
+      display: block;
+    }
+    .debt-form { grid-area: form; }
+    .debt-form h2 {
+      margin-bottom: 10px;
+      font-size: 1.5rem;
+      color: var(--accent-color);
+      border-bottom: 1px solid var(--primary-color);
+      padding-bottom: 5px;
+    }
+    .entry-form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      text-align: left;
+    }
+    .entry-form label { font-weight: 600; }
+    .entry-form select,
+    .entry-form input {
+      padding: 10px;
+      border: 1px solid var(--primary-color);
+      border-radius: 4px;
+      transition: border-color 0.3s;
+    }
+    .entry-form select:focus,
+    .entry-form input:focus {
+      border-color: var(--accent-color);
+      outline: none;
+    }
+    .preset-amounts { display: flex; gap: 10px; }
+    .amount-btn {
+      padding: 10px 14px;
+      border: 1px solid var(--accent-color);
+      border-radius: 4px;
+      background: var(--background-color);
+      color: var(--accent-color);
+      cursor: pointer;
+      transition: background-color 0.3s, transform 0.2s;
+      font-weight: 500;
+    }
+    .amount-btn:hover, .amount-btn.active {
+      background-color: var(--accent-color);
+      color: #fff;
+    }
+    #customAmountInput {
+      padding: 10px;
+      border: 1px solid var(--accent-color);
+      border-radius: 4px;
+      display: none;
+      transition: border-color 0.3s;
+    }
+    #backToPresets {
+      padding: 6px 10px;
+      border: none;
+      background-color: var(--accent-color);
+      color: #fff;
+      border-radius: 4px;
+      cursor: pointer;
+      display: none;
+      transition: background-color 0.3s;
+    }
+    .entry-form button.submit-entry {
+      align-self: center;
+      padding: 10px 14px;
+      border: none;
+      background-color: var(--accent-color);
+      color: var(--background-color);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s, transform 0.2s;
+      font-weight: 600;
+    }
+    .entry-form button.submit-entry:hover {
+      background-color: var(--primary-color);
+      transform: scale(1.02);
+    }
+    /* Profile Transactions Table */
+    #profileEntriesTable {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: center;
+    }
+    #profileEntriesTable th,
+    #profileEntriesTable td {
+      padding: 10px;
+      border-bottom: 1px solid var(--primary-color);
+      font-size: 0.9rem;
+    }
+    #profileEntriesTable th {
+      background-color: var(--primary-color);
+      color: var(--accent-color);
+    }
+    /* Analytics Page */
+    #analyticsContainer {
+      width: 95%;
+      max-width: 1200px;
+      margin: 0 auto 20px auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      text-align: center;
+    }
+    #analyticsTransactionsCard table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    #analyticsTransactionsCard th,
+    #analyticsTransactionsCard td {
+      padding: 10px;
+      border-bottom: 1px solid var(--primary-color);
+      font-size: 0.9rem;
+    }
+    #analyticsTransactionsCard th {
+      background-color: var(--primary-color);
+      color: var(--accent-color);
+    }
+    .pending-physical {
+      background-color: #ffcccc;
+    }
+    .auth-container {
+      max-width: 400px;
+      margin: 40px auto;
+      background-color: var(--background-color);
+      padding: 20px;
+      border: 1px solid var(--primary-color);
+      border-radius: 4px;
+      box-shadow: var(--box-shadow);
+      text-align: center;
+    }
+    .auth-container input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid var(--primary-color);
+      border-radius: 4px;
+      margin-bottom: 10px;
+      transition: border-color 0.3s;
+    }
+    .auth-container input:focus {
+      border-color: var(--accent-color);
+      outline: none;
+    }
+    .auth-container button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      border: none;
+      background-color: var(--accent-color);
+      color: var(--background-color);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+      font-weight: 600;
+    }
+    .auth-container button:hover {
+      background-color: var(--primary-color);
+    }
+    /* Profile Page – add Reset Password form below Profile Management */
+    .reset-password-form {
+      margin-top: 20px;
+      text-align: left;
+    }
+    .reset-password-form input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid var(--primary-color);
+      border-radius: 4px;
+      margin-bottom: 10px;
+      transition: border-color 0.3s;
+    }
+    .reset-password-form input:focus {
+      border-color: var(--accent-color);
+      outline: none;
+    }
+    .reset-password-form button {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      background-color: var(--accent-color);
+      color: var(--background-color);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+      font-weight: 600;
+    }
+    .reset-password-form button:hover {
+      background-color: var(--primary-color);
+    }
+    .graph-section {
+  grid-area: graph;
+  min-height: 600px; /* optional minimum height */
+  height: 600px;      /* allow height to adjust based on content */
+  position: relative;
+  overflow: visible; /* let the container expand */
+}
+
+.graph-section canvas {
+  width: 100% !important;
+  height: auto !important;
+  display: block;
+}
+
+    /* Profile Page override grid */
+    .dashboard-container[style] {
+      grid-template-areas:
+        "record record"
+        "profile profile"
+        "trans trans";
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Debt Tracker Dashboard</h1>
+  </header>
+  <nav class="top-nav" id="topNav">
+    <div class="nav-links">
+      <button data-page="dashboard">Dashboard</button>
+      <button data-page="analytics">Analytics</button>
+      <button data-page="profile">Profile</button>
+    </div>
+    <div class="auth-actions">
+      <button id="navLogout">Log Out</button>
+    </div>
+  </nav>
+
+  <!-- Authentication Section -->
+  <div id="authSection" class="auth-container">
+    <h2>Please Log In or Sign Up</h2>
+    <input type="text" id="authUsername" placeholder="Username">
+    <input type="password" id="authPassword" placeholder="Password">
+    <button id="loginBtn">Log In</button>
+    <button id="signupBtn">Sign Up</button>
+    <div id="authMessage" style="color: red;"></div>
+  </div>
+
+  <!-- Main App Section -->
+  <div id="appSection" style="display: none;">
+    <!-- Dashboard Page -->
+    <div id="pageDashboard" class="page active">
+      <div class="dashboard-container">
+        <!-- Virtual Leaderboard -->
+        <div class="card leaderboard virtual-leaderboard">
+          <h2>Virtual Leaderboard</h2>
+          <div class="leaderboard-list" id="virtualLeaderboardList"></div>
+        </div>
+        <!-- Physical Leaderboard -->
+        <div class="card leaderboard physical-leaderboard">
+          <h2>Physical Leaderboard</h2>
+          <div class="leaderboard-list" id="physicalLeaderboardList"></div>
+        </div>
+        <!-- Virtual Transaction Form -->
+        <div class="card debt-form">
+          <h2>Give Money (Virtual)</h2>
+          <form id="debtForm" class="entry-form">
+            <label for="receiverSelect">Receiver</label>
+            <select id="receiverSelect" required>
+              <option value="">Select Receiver</option>
+            </select>
+            <label for="amount">Amount</label>
+            <div class="preset-amounts" id="presetAmounts">
+              <button type="button" class="amount-btn" data-amount="5">5 ₪</button>
+              <button type="button" class="amount-btn" data-amount="10">10 ₪</button>
+              <button type="button" class="amount-btn" id="customAmountBtn">Custom</button>
+            </div>
+            <input type="number" id="customAmountInput" step="0.01" placeholder="Enter custom amount">
+            <button type="button" id="backToPresets">Back to Presets</button>
+            <label for="entryDescription">Reason</label>
+            <input type="text" id="entryDescription" placeholder="Optional reason">
+            <button type="submit" class="submit-entry">Give Money</button>
+          </form>
+        </div>
+        <!-- Virtual Graph -->
+
+      </div>
+    </div>
+
+    <!-- Analytics Page -->
+    <div id="pageAnalytics" class="page">
+      <div id="analyticsContainer">
+        <div class="card graph-section">
+          <h2>Balance History (Virtual)</h2>
+          <canvas id="balanceChart2"></canvas>
+        </div>
+        <div class="card" id="analyticsTransactionsCard">
+          <h2>All Transactions</h2>
+          <table id="analyticsTable">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Debtor</th>
+                <th>Creditor</th>
+                <th>Amount</th>
+                <th>Type</th>
+                <th>Reason</th>
+                <th>Date</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Profile Management Page -->
+    <div id="pageProfile" class="page">
+      <div class="dashboard-container" style="grid-template-areas: 'record record' 'profile profile' 'trans trans';">
+        <!-- Record Physical Payment -->
+        <div class="card" style="grid-area: record;">
+          <h2>Record Physical Payment</h2>
+          <form id="physicalPaymentForm" class="entry-form">
+            <label for="physicalReceiverSelect">Receiver</label>
+            <select id="physicalReceiverSelect" required>
+              <option value="">Select Receiver</option>
+            </select>
+            <label for="physicalAmount">Amount</label>
+            <input type="number" id="physicalAmount" step="0.01" placeholder="Enter amount" required>
+            <label for="physicalReason">Reason</label>
+            <input type="text" id="physicalReason" placeholder="Enter reason" required>
+            <button type="submit" class="submit-entry">Record Payment</button>
+          </form>
+        </div>
+        <!-- Profile Management and Reset Password -->
+        <div class="card" style="grid-area: profile;">
+          <h2>Profile Management</h2>
+          <form id="profileForm" class="entry-form">
+            <label for="newUsername">Change Username</label>
+            <input type="text" id="newUsername" placeholder="New Username">
+            <label for="profilePicUrl">Profile Picture URL</label>
+            <input type="text" id="profilePicUrl" placeholder="Image URL">
+            <button type="submit" class="submit-entry">Update Profile</button>
+          </form>
+          <div class="reset-password-form">
+            <h3>Reset Password</h3>
+            <input type="password" id="oldPassword" placeholder="Old Password">
+            <input type="password" id="newPassword" placeholder="New Password">
+            <button id="resetPasswordBtn">Reset Password</button>
+          </div>
+        </div>
+        <!-- Transactions and Summary -->
+        <div class="card" style="grid-area: trans;">
+          <h2>Your Transactions</h2>
+          <table id="profileEntriesTable">
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Rank</th>
+                <th>Counterparty</th>
+                <th>Amount</th>
+                <th>Reason</th>
+                <th>Date</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <div class="profile-summary">
+            <h2>Payment Summary</h2>
+            <p>Virtual Debt: <span id="virtualDebt"></span> ₪</p>
+            <p>Physical Payments Given: <span id="physicalGiven"></span> ₪</p>
+            <p>Virtual Receivables: <span id="virtualReceivable"></span> ₪</p>
+            <p>Physical Payments Received: <span id="physicalReceived"></span> ₪</p>
+            <p>Money Returned: <span id="moneyReturned"></span> ₪</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentUser = null;
+    let users = [];
+    let entries = [];
+    let selectedAmount = null;
+    let balanceChart = null;
+    let balanceChart2 = null;
+
+    // DOM references
+    const authSection = document.getElementById('authSection');
+    const appSection = document.getElementById('appSection');
+    const authUsername = document.getElementById('authUsername');
+    const authPassword = document.getElementById('authPassword');
+    const authMessage = document.getElementById('authMessage');
+    const loginBtn = document.getElementById('loginBtn');
+    const signupBtn = document.getElementById('signupBtn');
+    const topNav = document.getElementById('topNav');
+    const navLogout = document.getElementById('navLogout');
+    const navLinks = document.querySelectorAll('nav.top-nav .nav-links button');
+
+    const pageDashboard = document.getElementById('pageDashboard');
+    const pageAnalytics = document.getElementById('pageAnalytics');
+    const pageProfile = document.getElementById('pageProfile');
+
+    // Dashboard
+    const virtualLeaderboardList = document.getElementById('virtualLeaderboardList');
+    const physicalLeaderboardList = document.getElementById('physicalLeaderboardList');
+    const receiverSelect = document.getElementById('receiverSelect');
+    const presetAmountsEl = document.getElementById('presetAmounts');
+    const customAmountInput = document.getElementById('customAmountInput');
+    const customAmountBtn = document.getElementById('customAmountBtn');
+    const backToPresetsBtn = document.getElementById('backToPresets');
+    const debtForm = document.getElementById('debtForm');
+    const balanceChartCanvas = document.getElementById('balanceChart');
+
+    // Analytics
+    const balanceChartCanvas2 = document.getElementById('balanceChart2');
+    const analyticsTable = document.querySelector('#analyticsTable tbody');
+
+    // Profile
+    const profileForm = document.getElementById('profileForm');
+    const newUsernameInput = document.getElementById('newUsername');
+    const profilePicUrlInput = document.getElementById('profilePicUrl');
+    const oldPasswordInput = document.getElementById('oldPassword');
+    const newPasswordInput = document.getElementById('newPassword');
+    const resetPasswordBtn = document.getElementById('resetPasswordBtn');
+    const profileEntriesTableBody = document.querySelector('#profileEntriesTable tbody');
+    const virtualDebtSpan = document.getElementById('virtualDebt');
+    const physicalGivenSpan = document.getElementById('physicalGiven');
+    const virtualReceivableSpan = document.getElementById('virtualReceivable');
+    const physicalReceivedSpan = document.getElementById('physicalReceived');
+    const moneyReturnedSpan = document.getElementById('moneyReturned');
+    const physicalPaymentForm = document.getElementById('physicalPaymentForm');
+    const physicalReceiverSelect = document.getElementById('physicalReceiverSelect');
+    const physicalAmountInput = document.getElementById('physicalAmount');
+    const physicalReasonInput = document.getElementById('physicalReason');
+
+    const API_BASE = '/api';
+
+    // Navigation
+    function showPage(pageId) {
+      document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+      document.getElementById(pageId).classList.add('active');
+      if (pageId === 'pageAnalytics') {
+        renderGraph2();
+        renderAnalyticsTable();
+      }
+      if (pageId === 'pageProfile') {
+        renderProfileEntries();
+        renderProfileSummary();
+      }
+    }
+    navLinks.forEach(link => {
+      link.addEventListener('click', () => {
+        const page = link.getAttribute('data-page');
+        showPage('page' + page.charAt(0).toUpperCase() + page.slice(1));
+      });
+    });
+    navLogout.addEventListener('click', () => {
+      currentUser = null;
+      authSection.style.display = 'flex';
+      appSection.style.display = 'none';
+    });
+    function showAuthMessage(msg) {
+      authMessage.textContent = msg;
+    }
+
+    // Login and Signup
+    loginBtn.addEventListener('click', async () => {
+      const username = authUsername.value.trim();
+      const password = authPassword.value.trim();
+      if (!username || !password) {
+        showAuthMessage("Please enter username and password.");
+        return;
+      }
+      try {
+        const res = await fetch(API_BASE + '/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (data.success) {
+          currentUser = data.user;
+          initializeApp();
+        } else {
+          showAuthMessage(data.message || "Login failed.");
+        }
+      } catch (err) {
+        console.error(err);
+        showAuthMessage("An error occurred during login.");
+      }
+    });
+    signupBtn.addEventListener('click', async () => {
+      const username = authUsername.value.trim();
+      const password = authPassword.value.trim();
+      if (!username || !password) {
+        showAuthMessage("Please enter username and password.");
+        return;
+      }
+      try {
+        const res = await fetch(API_BASE + '/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (data.success) {
+          currentUser = data.user;
+          initializeApp();
+        } else {
+          showAuthMessage(data.message || "Signup failed.");
+        }
+      } catch (err) {
+        console.error(err);
+        showAuthMessage("An error occurred during signup.");
+      }
+    });
+
+    async function initializeApp() {
+      authSection.style.display = 'none';
+      appSection.style.display = 'block';
+      topNav.style.display = 'flex';
+      await fetchUsers();
+      await fetchEntries();
+      renderUsersSelect();
+      renderPhysicalReceiverSelect();
+      renderVirtualLeaderboard();
+      renderPhysicalLeaderboard();
+      renderGraph();
+    }
+
+    async function fetchUsers() {
+      try {
+        const res = await fetch(API_BASE + '/users');
+        const data = await res.json();
+        if (data.success) {
+          users = data.users;
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    async function fetchEntries() {
+      try {
+        const res = await fetch(API_BASE + '/entries');
+        const data = await res.json();
+        if (data.success) {
+          entries = data.entries;
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // Populate receiver selects
+    function renderUsersSelect() {
+      receiverSelect.innerHTML = '<option value="">Select Receiver</option>';
+      users.forEach(user => {
+        if (user.username !== currentUser.username) {
+          const opt = document.createElement('option');
+          opt.value = user.username;
+          opt.textContent = user.username;
+          receiverSelect.appendChild(opt);
+        }
+      });
+    }
+    function renderPhysicalReceiverSelect() {
+      physicalReceiverSelect.innerHTML = '<option value="">Select Receiver</option>';
+      users.forEach(user => {
+        if (user.username !== currentUser.username) {
+          const opt = document.createElement('option');
+          opt.value = user.username;
+          opt.textContent = user.username;
+          physicalReceiverSelect.appendChild(opt);
+        }
+      });
+    }
+
+    // Leaderboard Calculations (unchanged graph code)
+    function renderVirtualLeaderboard() {
+  const virtualBalances = {};
+  users.forEach(u => { virtualBalances[u.username] = 0; });
+  entries.forEach(e => {
+    if (e.paymentMethod === 'physical') return;
+    const amt = parseFloat(e.amount);
+    virtualBalances[e.creditor] += amt;
+    virtualBalances[e.debtor] -= amt;
+  });
+  const sorted = Object.entries(virtualBalances).sort((a, b) => b[1] - a[1]);
+  virtualLeaderboardList.innerHTML = '';
+  if (sorted.length === 0) {
+    virtualLeaderboardList.innerHTML = '<p>No data</p>';
+    return;
+  }
+  const maxAbs = Math.max(...sorted.map(item => Math.abs(item[1]))) || 1;
+  sorted.forEach(([username, balance], idx) => {
+    const userObj = users.find(u => u.username === username);
+    const color = getLeaderboardColor(balance, maxAbs);
+    const div = document.createElement('div');
+    div.classList.add('leaderboard-item');
+    div.innerHTML = `
+      <span>${idx + 1}.</span>
+      <img src="${userObj?.profilePicture || 'https://via.placeholder.com/40?text=User'}" alt="${username}">
+      <div class="info" style="background-color: ${color}; color: black;">
+        <span>${username}: ${balance.toFixed(2)} ₪</span>
+      </div>
+    `;
+    virtualLeaderboardList.appendChild(div);
+  });
+}
+
+function renderPhysicalLeaderboard() {
+  const physicalBalances = {};
+  users.forEach(u => { physicalBalances[u.username] = 0; });
+  entries.forEach(e => {
+    if (e.paymentMethod === 'physical' && e.approved) {
+      const amt = parseFloat(e.amount);
+      physicalBalances[e.creditor] += amt;
+      physicalBalances[e.debtor] -= amt;
+    }
+  });
+  const sorted = Object.entries(physicalBalances).sort((a, b) => b[1] - a[1]);
+  physicalLeaderboardList.innerHTML = '';
+  if (sorted.length === 0) {
+    physicalLeaderboardList.innerHTML = '<p>No data</p>';
+    return;
+  }
+  const maxAbs = Math.max(...sorted.map(item => Math.abs(item[1]))) || 1;
+  sorted.forEach(([username, balance], idx) => {
+    const userObj = users.find(u => u.username === username);
+    const color = getLeaderboardColor(balance, maxAbs);
+    const div = document.createElement('div');
+    div.classList.add('leaderboard-item');
+    div.innerHTML = `
+      <span>${idx + 1}.</span>
+      <img src="${userObj?.profilePicture || 'https://via.placeholder.com/40?text=User'}" alt="${username}">
+      <div class="info" style="background-color: ${color}; color: black;">
+        <span>${username}: ${balance.toFixed(2)} ₪</span>
+      </div>
+    `;
+    physicalLeaderboardList.appendChild(div);
+  });
+}
+
+    function getLeaderboardColor(balance, maxAbs) {
+      const norm = balance / maxAbs;
+      const yellow = { r: 248, g: 237, b: 140 };
+      const green = {r: 137,g: 172,b: 70};
+      const red = { r: 255, g: 137, b: 137 };
+      function interpolate(c1, c2, t) {
+        return {
+          r: Math.round(c1.r + (c2.r - c1.r) * t),
+          g: Math.round(c1.g + (c2.g - c1.g) * t),
+          b: Math.round(c1.b + (c2.b - c1.b) * t)
+        };
+      }
+      function rgbToHex(rgb) {
+        const r = rgb.r.toString(16).padStart(2, '0');
+        const g = rgb.g.toString(16).padStart(2, '0');
+        const b = rgb.b.toString(16).padStart(2, '0');
+        return "#" + r + g + b;
+      }
+      if (norm >= 0) {
+        return rgbToHex(interpolate(yellow, green, norm));
+      } else {
+        return rgbToHex(interpolate(yellow, red, -norm));
+      }
+    }
+    function getRandomColor() {
+      const letters = '0123456789ABCDEF';
+      let color = '#';
+      for (let i = 0; i < 6; i++) {
+        color += letters[Math.floor(Math.random() * 16)];
+      }
+      return color;
+    }
+
+    // Graph functions (unchanged)
+    function renderGraph() {
+      if (balanceChart) balanceChart.destroy();
+      const userHistories = {};
+      users.forEach(u => { userHistories[u.username] = [{ date: new Date(0), balance: 0 }]; });
+      const sorted = [...entries].sort((a, b) => new Date(a.date) - new Date(b.date));
+      const runningBalances = {};
+      users.forEach(u => { runningBalances[u.username] = 0; });
+      sorted.forEach(e => {
+        if (e.paymentMethod === 'physical') return;
+        const amt = parseFloat(e.amount);
+        runningBalances[e.creditor] += amt;
+        runningBalances[e.debtor] -= amt;
+        [e.creditor, e.debtor].forEach(uName => {
+          userHistories[uName].push({
+            date: new Date(e.date),
+            balance: runningBalances[uName]
+          });
+        });
+      });
+      const datasets = [];
+      Object.keys(userHistories).forEach(username => {
+        const h = userHistories[username];
+        if (h.length <= 1 && h[0].balance === 0) return;
+        datasets.push({
+          label: username,
+          data: h.map(p => ({ x: p.date, y: p.balance })),
+          borderColor: getRandomColor(),
+          fill: false
+        });
+      });
+      balanceChart = new Chart(balanceChartCanvas, {
+        type: 'line',
+        data: { datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { type: 'time', time: { unit: 'day' }, title: { display: true, text: 'Time' } },
+            y: { title: { display: true, text: 'Balance (₪)' } }
+          }
+        }
+      });
+    }
+    function renderGraph2() {
+      if (balanceChart2) balanceChart2.destroy();
+      const userHistories = {};
+      users.forEach(u => { userHistories[u.username] = [{ date: new Date(0), balance: 0 }]; });
+      const sorted = [...entries].sort((a, b) => new Date(a.date) - new Date(b.date));
+      const runningBalances = {};
+      users.forEach(u => { runningBalances[u.username] = 0; });
+      sorted.forEach(e => {
+        if (e.paymentMethod === 'physical') return;
+        const amt = parseFloat(e.amount);
+        runningBalances[e.creditor] += amt;
+        runningBalances[e.debtor] -= amt;
+        [e.creditor, e.debtor].forEach(uName => {
+          userHistories[uName].push({
+            date: new Date(e.date),
+            balance: runningBalances[uName]
+          });
+        });
+      });
+      const datasets = [];
+      Object.keys(userHistories).forEach(username => {
+        const h = userHistories[username];
+        if (h.length <= 1 && h[0].balance === 0) return;
+        datasets.push({
+          label: username,
+          data: h.map(p => ({ x: p.date, y: p.balance })),
+          borderColor: getRandomColor(),
+          fill: false
+        });
+      });
+      balanceChart2 = new Chart(balanceChartCanvas2, {
+        type: 'line',
+        data: { datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: {
+        padding: {
+          bottom: 100  // add extra space at the bottom
+        }
+      },
+          scales: {
+            x: { type: 'time', time: { unit: 'day' }, title: { display: true, text: 'Time' } },
+            y: { title: { display: true, text: 'Balance (₪)' } }
+          },
+          layout: { padding: { bottom: 20 } }
+        }
+      });
+    }
+
+    // Analytics Table
+    function renderAnalyticsTable() {
+      analyticsTable.innerHTML = '';
+      const sorted = [...entries].sort((a, b) => new Date(b.date) - new Date(a.date));
+      sorted.forEach(e => {
+        const tr = document.createElement('tr');
+        if (e.paymentMethod === 'physical' && !e.approved) {
+          tr.classList.add('pending-physical');
+        }
+        const typeLabel = (e.paymentMethod === 'physical') ? 'Physical' : 'Virtual';
+        const status = (e.paymentMethod === 'physical')
+          ? (e.approved ? 'Approved' : 'Not Approved')
+          : 'N/A';
+        tr.innerHTML = `
+          <td>${e.id}</td>
+          <td>${e.debtor}</td>
+          <td>${e.creditor}</td>
+          <td>${parseFloat(e.amount).toFixed(2)}</td>
+          <td>${typeLabel}</td>
+          <td>${e.description || ''}</td>
+          <td>${new Date(e.date).toLocaleString()}</td>
+          <td>${status}</td>
+        `;
+        analyticsTable.appendChild(tr);
+      });
+    }
+
+    // Profile Transactions Table
+    function renderProfileEntries() {
+      profileEntriesTableBody.innerHTML = '';
+      const filtered = entries.filter(e =>
+        e.debtor === currentUser.username || e.creditor === currentUser.username
+      );
+      filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+      filtered.forEach(e => {
+        let type = (e.debtor === currentUser.username) ? "Given" : "Received";
+        type += (e.paymentMethod === "physical") ? " (Physical)" : " (Virtual)";
+        const counterparty = (e.debtor === currentUser.username) ? e.creditor : e.debtor;
+        let actionButton = "";
+        if (e.paymentMethod === "physical" && e.creditor === currentUser.username && !e.approved) {
+          actionButton = `<button class="approve-btn" data-id="${e.id}">Mark as Paid</button>`;
+        }
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${type}</td>
+          <td></td>
+          <td>${counterparty}</td>
+          <td>${parseFloat(e.amount).toFixed(2)} ₪</td>
+          <td>${e.description}</td>
+          <td>${new Date(e.date).toLocaleString()}</td>
+          <td>${actionButton}</td>
+        `;
+        profileEntriesTableBody.appendChild(tr);
+      });
+      // Add ranking numbers to the second cell of each row.
+      const rows = profileEntriesTableBody.querySelectorAll('tr');
+      rows.forEach((row, idx) => {
+        row.children[1].textContent = idx + 1;
+      });
+      document.querySelectorAll('.approve-btn').forEach(btn => {
+        btn.addEventListener('click', async function() {
+          const id = parseInt(this.getAttribute('data-id'));
+          await approvePhysical(id);
+        });
+      });
+    }
+    async function approvePhysical(id) {
+      try {
+        const res = await fetch(API_BASE + '/entry/approve', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, username: currentUser.username })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert("Physical payment approved.");
+          // After approval, create an offset virtual entry to adjust virtual balances.
+          const entry = entries.find(e => e.id === id);
+          if (entry) {
+            // This offset reverses the virtual effect:
+            // It transfers 2× the approved amount from the creditor to the debtor.
+            const offsetEntry = {
+              debtor: entry.creditor,
+              creditor: entry.debtor,
+              amount: entry.amount,
+              description: "Offset for approved physical payment",
+              status: "accepted",
+              paid: false,
+              paymentMethod: "virtual",
+              date: new Date().toISOString()
+            };
+            const offsetRes = await fetch(API_BASE + '/entry', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(offsetEntry)
+            });
+            const offsetData = await offsetRes.json();
+            if (!offsetData.success) {
+              alert("Failed to create offset entry: " + (offsetData.message || ""));
+            }
+          }
+          await fetchEntries();
+          renderVirtualLeaderboard();
+          renderPhysicalLeaderboard();
+          renderGraph();
+          renderGraph2();
+          renderProfileEntries();
+          renderProfileSummary();
+        } else {
+          alert(data.message || "Failed to approve physical transaction.");
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // Profile Summary – virtual totals come solely from virtual transactions.
+    // Money Returned is computed as the sum of approved physical transactions where the current user is the debtor.
+    function renderProfileSummary() {
+      let virtualDebt = 0, physicalGiven = 0, virtualReceivable = 0, physicalReceived = 0, moneyReturned = 0;
+      entries.forEach(e => {
+        const amt = parseFloat(e.amount);
+        if (e.debtor === currentUser.username) {
+          if (e.paymentMethod === 'virtual') {
+            virtualDebt += amt;
+          } else if (e.paymentMethod === 'physical' && e.approved) {
+            physicalGiven += amt;
+            moneyReturned += amt;
+          }
+        }
+        if (e.creditor === currentUser.username) {
+          if (e.paymentMethod === 'virtual') {
+            virtualReceivable += amt;
+          } else if (e.paymentMethod === 'physical' && e.approved) {
+            physicalReceived += amt;
+          }
+        }
+      });
+      virtualDebtSpan.textContent = virtualDebt.toFixed(2);
+      physicalGivenSpan.textContent = physicalGiven.toFixed(2);
+      virtualReceivableSpan.textContent = virtualReceivable.toFixed(2);
+      physicalReceivedSpan.textContent = physicalReceived.toFixed(2);
+      moneyReturnedSpan.textContent = moneyReturned.toFixed(2);
+    }
+
+    // Preset Amount Buttons
+    presetAmountsEl.addEventListener('click', function(e) {
+      if (e.target.classList.contains('amount-btn') && e.target.id !== 'customAmountBtn') {
+        document.querySelectorAll('.amount-btn').forEach(btn => btn.classList.remove('active'));
+        e.target.classList.add('active');
+        selectedAmount = e.target.getAttribute('data-amount');
+        customAmountInput.style.display = 'none';
+        backToPresetsBtn.style.display = 'none';
+      }
+    });
+    customAmountBtn.addEventListener('click', function() {
+      document.querySelectorAll('.amount-btn').forEach(btn => btn.classList.remove('active'));
+      selectedAmount = null;
+      customAmountInput.style.display = 'block';
+      backToPresetsBtn.style.display = 'inline-block';
+    });
+    backToPresetsBtn.addEventListener('click', function() {
+      customAmountInput.style.display = 'none';
+      backToPresetsBtn.style.display = 'none';
+      customAmountInput.value = '';
+    });
+
+    // Submit Virtual Transaction
+    debtForm.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const receiver = receiverSelect.value;
+      let amount = null;
+      if (customAmountInput.style.display === 'block' && customAmountInput.value) {
+        amount = customAmountInput.value;
+      } else if (selectedAmount !== null) {
+        amount = selectedAmount;
+      } else {
+        alert('Please select or enter an amount.');
+        return;
+      }
+      const description = document.getElementById('entryDescription').value.trim();
+      if (!receiver) {
+        alert('Please select a receiver.');
+        return;
+      }
+      const newEntry = {
+        debtor: currentUser.username,
+        creditor: receiver,
+        amount,
+        description,
+        status: "accepted",
+        paid: false,
+        paymentMethod: "virtual",
+        date: new Date().toISOString()
+      };
+      try {
+        const res = await fetch(API_BASE + '/entry', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newEntry)
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert("Virtual transaction created.");
+          await fetchEntries();
+          renderVirtualLeaderboard();
+          renderPhysicalLeaderboard();
+          renderGraph();
+          renderGraph2();
+          debtForm.reset();
+          selectedAmount = null;
+          document.querySelectorAll('.amount-btn').forEach(btn => btn.classList.remove('active'));
+          customAmountInput.style.display = 'none';
+          backToPresetsBtn.style.display = 'none';
+        } else {
+          alert("Failed to add entry.");
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    });
+
+    // Submit Physical Transaction
+    physicalPaymentForm.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const receiver = physicalReceiverSelect.value;
+      const amount = physicalAmountInput.value;
+      const reason = physicalReasonInput.value.trim();
+      if (!receiver || !amount || !reason) {
+        alert("Please fill out all fields.");
+        return;
+      }
+      const newEntry = {
+        debtor: currentUser.username,
+        creditor: receiver,
+        amount,
+        description: reason,
+        status: "accepted",
+        paid: false,
+        paymentMethod: "physical",
+        approved: false,
+        date: new Date().toISOString()
+      };
+      try {
+        const res = await fetch(API_BASE + '/entry', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newEntry)
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert("Physical payment recorded. Awaiting receiver approval.");
+          await fetchEntries();
+          renderVirtualLeaderboard();
+          renderPhysicalLeaderboard();
+          renderGraph();
+          renderGraph2();
+          renderProfileEntries();
+          renderProfileSummary();
+          physicalPaymentForm.reset();
+        } else {
+          alert("Failed to record physical payment.");
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    });
+
+    // Reset Password Feature
+    resetPasswordBtn.addEventListener('click', async () => {
+      const oldPass = oldPasswordInput.value.trim();
+      const newPass = newPasswordInput.value.trim();
+      if (!oldPass || !newPass) {
+        alert("Please fill out both fields for password reset.");
+        return;
+      }
+      try {
+        const res = await fetch(API_BASE + '/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: currentUser.username, oldPassword: oldPass, newPassword: newPass })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert("Password reset successfully.");
+          oldPasswordInput.value = "";
+          newPasswordInput.value = "";
+        } else {
+          alert(data.message || "Password reset failed.");
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    });
+
+    // Profile Update
+    profileForm.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const newUsername = newUsernameInput.value.trim();
+      const profilePicUrl = profilePicUrlInput.value.trim();
+      try {
+        const res = await fetch(API_BASE + '/user', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: currentUser.username,
+            newUsername,
+            profilePicture: profilePicUrl
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          currentUser = data.user;
+          alert("Profile updated successfully.");
+          await fetchUsers();
+          renderUsersSelect();
+          renderPhysicalReceiverSelect();
+          renderVirtualLeaderboard();
+          renderPhysicalLeaderboard();
+          renderProfileEntries();
+          renderProfileSummary();
+        } else {
+          alert(data.message || "Failed to update profile.");
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    });
+  </script>
+</body>
+</html>
